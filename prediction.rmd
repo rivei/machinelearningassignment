@@ -1,0 +1,208 @@
+---
+title: "Untitled"
+author: "Wei Lin"
+date: "14 February 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.path = "figure/", fig.width = 6, fig.height = 6)
+
+library(dplyr)
+library(caret)
+```
+
+## Peer-graded Assignment: Prediction Assignment Writeup
+
+### Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+
+The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. 
+
+You may use any of the other variables to predict with. 
+You should create a report describing 
+
+how you built your model, 
+
+how you used cross validation, 
+
+what you think the expected out of sample error is
+
+why you made the choices you did. 
+
+You will also use your prediction model to predict 20 different test cases.
+
+
+For feature extraction we used a sliding window approach
+with different lengths from 0.5 second to 2.5 seconds, with
+0.5 second overlap. In each step of the sliding window approach
+we calculated features on the Euler angles (roll, pitch
+and yaw), as well as the raw accelerometer, gyroscope and
+magnetometer readings. For the Euler angles of each of the
+four sensors we calculated eight features: mean, variance,
+standard deviation, max, min, amplitude, kurtosis and skewness,
+generating in total 96 derived feature sets.
+
+17 features were selected:
+in the belt, were selected 
+the mean and variance of the roll,
+maximum, range and variance of the accelerometer vector,
+variance of the gyro and variance of the magnetometer. 
+In the arm, the variance of the accelerometer vector
+and the maximum and minimum of the magnetometer were selected.
+
+In the dumbbell, the selected features were the maximum of the acceleration, 
+variance of the gyro and maximum and minimum of the magnetometer, 
+in the glove, the sum of the pitch and the maximum and minimum of the gyro
+were selected.
+
+
+Because of the characteristic noise in the sensor data, we
+used a Random Forest approach [28]. This algorithm is
+characterized by a subset of features, selected in a random
+and independent manner with the same distribution for each
+of the trees in the forest. To improve recognition performance
+we used an ensemble of classifiers using the "Bagging"
+method [6]. We used 10 random forests and each forest was
+implemented with 10 trees. The classifier was tested with
+10-fold cross-validation and different windows sizes, all of
+them with 0.5s overlapping (except the window with 0.5s).
+The best window size found for this classification task was of
+2.5s and the overall recognition performance was of 98.03%
+(see Table 1). The table shows false positive rate (FPR),
+precision, recall, as well as area under the curve (AUC) averaged
+for each of the 5 tested on 10-fold cross-validation
+over all 6 participants (5 classes). With the 2.5s window
+size, the detailed accuracy by class was of: (A) 97.6%, (B)
+97.3%, (C) 98.2%, (D) 98.1%, (E) 99.1%, (98.2% weighted
+average).
+
+1. Read the raw data, and have a general look into it.
+```{r readdata}
+
+colclas <- c(c("factor", "factor","factor","factor","factor","factor"),c("numeric")[rep(1, times = 153)],"factor")
+
+
+if(!file.exists("pml-training.csv")) {
+        download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv",
+                      destfile = "pml-training.csv")
+}
+pmlraw <- read.csv("pml-training.csv", header = TRUE, na.strings = "NA") #colClasses = colclas)
+
+# colclas <- apply(pmlraw,2,function(x) class(x))
+
+plmValid <- read.csv("pml-testing.csv" ,header = TRUE,  na.strings = "NA")
+#, colClasses = c("character", #"factor","factor","factor","factor","factor",rep("numeric",  153),"factor"))
+
+
+# clean all empty columns
+pml1 <- pmlraw
+pml1<-pml1[which(pml1$new_window=="yes"),]
+#"var_total_accel_belt", 
+#"avg_roll_belt",
+#"total_accel_belt",
+#"avg_pitch_forearm",
+#"var_roll_belt","var_accel_arm"))
+
+pml2<-subset(pml1, select = c("roll_belt",
+"total_accel_belt",
+"total_accel_arm",
+"total_accel_dumbbell",
+"pitch_forearm",
+"gyros_belt_x",
+"gyros_belt_y",
+"gyros_belt_z",
+"magnet_belt_x",
+"magnet_belt_y",
+"magnet_belt_z",
+"magnet_arm_x",
+"magnet_arm_y",
+"magnet_arm_z",
+"gyros_dumbbell_x",
+"gyros_dumbbell_y",
+"gyros_dumbbell_z",
+"magnet_dumbbell_x",
+"magnet_dumbbell_y",
+"magnet_dumbbell_z",
+"gyros_forearm_x",
+"gyros_forearm_y",
+"gyros_forearm_z",
+"classe"))
+dim(pml2)
+
+pmlV <- subset(plmValid, select = c("roll_belt",
+"total_accel_belt",
+"total_accel_arm",
+"total_accel_dumbbell",
+"pitch_forearm",
+"gyros_belt_x",
+"gyros_belt_y",
+"gyros_belt_z",
+"magnet_belt_x",
+"magnet_belt_y",
+"magnet_belt_z",
+"magnet_arm_x",
+"magnet_arm_y",
+"magnet_arm_z",
+"gyros_dumbbell_x",
+"gyros_dumbbell_y",
+"gyros_dumbbell_z",
+"magnet_dumbbell_x",
+"magnet_dumbbell_y",
+"magnet_dumbbell_z",
+"gyros_forearm_x",
+"gyros_forearm_y",
+"gyros_forearm_z"))
+
+
+
+#pmlV <- pmlV[, apply(pmlV, 2, function(x) as.numeric(x))]
+## no need pmlV <- data.frame(apply(pmlV, 2 , as.numeric), "classe")
+
+##inBuild <- createDataPartition(y=pml2$classe, p=0.7, list = FALSE)
+##validation <- pml2[-inBuild,]
+##buildData <- pml2[inBuild,]
+
+inTrain <- createDataPartition(y=pml2$classe, p=0.7, list = FALSE)
+training <- pml2[inTrain,]
+testing <- pml2[-inTrain,]
+
+#dim(training)
+#dim(testing)
+##dim(validation)
+
+#mod1 <- train(classe ~., method = "lda", data=training)
+#mod1
+##mod2 <- train(classe ~., method = "nbDiscrete", data=training)
+
+
+mod2 <- train(classe ~., method = "rf", data=training)#, prox=TRUE)
+mod2
+
+#mod3 <- train(classe ~., method="nb", data=training)
+#mod3
+
+#pre1 = predict(mod1,testing)
+pre2 = predict(mod2, testing)
+#pre3 = predict(mod3, testing)
+
+
+#table(pre1, pre2)
+#table(pre1, testing$classe)
+table(pre2, testing$classe)
+#table(pre3, testing$classe)
+
+
+#predDF <- data.frame(pre1, pre2, testing$classe)
+#combMod <- train(testing.classe ~., method="gam", data=predDF)
+#combPre <- predict(combMod, predDF)
+
+#table(combPre, testing$classe)
+
+val <- predict(mod2, pmlV)
+val
+
+```
+
