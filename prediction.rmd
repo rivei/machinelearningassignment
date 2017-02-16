@@ -1,70 +1,93 @@
+---
+title: "Machine Learning Assignment"
+author: "W. Lin"
+date: "14 February 2017"
+output: html_document
+---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, fig.path = "figure/", fig.width = 6, fig.height = 6)
-
+knitr::opts_chunk$set(echo = TRUE)
 library(dplyr)
 library(caret)
 ```
 
-## Peer-graded Assignment: Prediction Assignment Writeup
-
-### Background
+## Background
 
 Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
 
 
-The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. 
+The goal of this project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. 
 
-1. Read the raw data, and have a general look into it.
+## Process:
+
+### 1. Preparation of clean data for building model.
 ```{r readdata}
 
-#if(!file.exists("./pml-training.csv")) {
-#        download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv",                      destfile = "./pml-training.csv")}
+if(!file.exists("../pml-training.csv")) {
+        download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv",
+                      destfile = "../pml-training.csv")
+}
 
-pmlorg <- read.csv("../pml-training.csv", header = TRUE, na.strings = "NA") #colClasses = colclas)
+dataorg <- read.csv("../pml-training.csv", header = TRUE, na.strings = c("","NA","#DIV/0!"))
+```
 
-# clean all empty rows
-pmltraining <- pmlorg
-pmltraining <- pmltraining[which(pmltraining$new_window=="yes"),]
+Columns with too many empty values and those not so relevant are deleted
+```{r}
+intraining <- dataorg[, 8:160]
+intraining <- intraining[, apply(intraining, 2, function(x) all(!is.na(x)))]
+colnumber <- dim(intraining)[2]
+```
 
-pmltraining<-subset(pmltraining, select = c("roll_belt",
-"total_accel_belt",
-"total_accel_arm",
-"total_accel_dumbbell",
-"pitch_forearm",
-"gyros_belt_x",
-"gyros_belt_y",
-"gyros_belt_z",
-"magnet_belt_x",
-"magnet_belt_y",
-"magnet_belt_z",
-"magnet_arm_x",
-"magnet_arm_y",
-"magnet_arm_z",
-"gyros_dumbbell_x",
-"gyros_dumbbell_y",
-"gyros_dumbbell_z",
-"magnet_dumbbell_x",
-"magnet_dumbbell_y",
-"magnet_dumbbell_z",
-"gyros_forearm_x",
-"gyros_forearm_y",
-"gyros_forearm_z",
-"classe"))
+Also highly correlated variables can be excluded, because they can be represented by their correlated variables
+```{r}
+corrDF <- cor(intraining[,1:colnumber -1])
+resCorr <- findCorrelation(corrDF, 0.5)
+intraining <- intraining[, -resCorr]
+
+```
+Till here, the dimension of the prediction data is reduced to: `r dim(intraining)`
 
 
-#inTrain <- createDataPartition(y=pml2$classe, p=0.7, list = FALSE)
-#training <- pml2[inTrain,]
-#testing <- pml2[-inTrain,]
+### 2. Use Ramdom Forest method to build the fitting model
+```{r mod}
+
+inTrain <- createDataPartition(y=intraining$classe, p=0.6, list = FALSE)
+training <- intraining[inTrain,]
+testing <- intraining[-inTrain,]
 
 
-#mod2 <- train(classe ~., method = "rf", data=training)#, prox=TRUE)
-#mod2
-
-#pre2 = predict(mod2, testing)
-
-#table(pre2, testing$classe)
-
+set.seed(1234)
+modfit <- train(classe ~., method = "rf", data=training)
+modfit
 
 ```
 
+
+### 3.Validate the fitting model using Confusion Matrix
+```{r }
+pred = predict(modfit, testing)
+confMx <- confusionMatrix(testing$classe, pred)
+confMx
+```
+In this model, the overall accuracy is `r confMx$overall["Accuracy"]*100`%
+
+### 4. Finally, this prediction model is used to predict 20 different test cases.
+```{r}
+if(!file.exists("../pml-testing.csv")) {
+        download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv",
+                      destfile = "../pml-testing.csv")
+}
+
+validation <- read.csv("../pml-testing.csv" ,header = TRUE,  na.strings = c("","NA","#DIV/0!"))
+
+colnumber <- dim(intraining)[2]
+validation <- subset(validation, select = names(intraining[,-colnumber]))
+
+results <- predict(modfit, validation)
+results <- paste(c(1:20), results, sep = ".")
+```
+
+## Result
+```{r showresult, echo = FALSE}
+results
+```
