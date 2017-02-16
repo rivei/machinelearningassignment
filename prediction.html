@@ -139,51 +139,29 @@ $(document).ready(function () {
 }
 
 dataorg &lt;- read.csv(&quot;../pml-training.csv&quot;, header = TRUE, na.strings = c(&quot;&quot;,&quot;NA&quot;,&quot;#DIV/0!&quot;))</code></pre>
-<p>Columns with too many empty values and those not so relevant (column 1 to 7) are deleted</p>
+<p>Columns with too many empty values and those not so relevant (columnS 1 to 7) are deleted</p>
 <pre class="r"><code>intraining &lt;- dataorg[, 8:160]
 intraining &lt;- intraining[, apply(intraining, 2, function(x) all(!is.na(x)))]</code></pre>
-<p>There are still 53 variables in the data, which is still too large dataset for running prediction. In this case, those highly correlated variables are excluded, because they can be represented by their correlated variables.</p>
+<p>There are still 53 variables in the data, which is a little too large dataset for running prediction. In this case, those highly correlated variables are excluded, because they can be represented by other correlated variables.</p>
 <pre class="r"><code>colnumber &lt;- dim(intraining)[2]
 corrDF &lt;- cor(intraining[,1:colnumber -1])
 resCorr &lt;- findCorrelation(corrDF, 0.6)
 intraining &lt;- intraining[, -resCorr]</code></pre>
-<p>Till here, the number of predictors is reduced to: 26</p>
+<p>Till here, the number of predictors is reduced to 26.</p>
 </div>
-<div id="use-boosting-and-ramdom-forest-method-to-build-the-fitting-model" class="section level3">
-<h3>Use Boosting and Ramdom Forest method to build the fitting model</h3>
+<div id="use-boosting-and-ramdom-forest-methods-to-build-the-fitting-model" class="section level3">
+<h3>Use Boosting and Ramdom Forest methods to build the fitting model</h3>
+<p>Both methods are learned in the lectures and they are suitable for classification like this case.</p>
 <pre class="r"><code>inTrain &lt;- createDataPartition(y=intraining$classe, p=0.7, list = FALSE)
 training &lt;- intraining[inTrain,]
 testing &lt;- intraining[-inTrain,]
 
 set.seed(1235)
-#modelda &lt;- train(classe ~., data=training, method = &quot;lda&quot;)
-modegbm &lt;- train(classe~., data = training, method = &quot;gbm&quot;, verbose = FALSE)</code></pre>
-<pre><code>## Loading required package: plyr</code></pre>
-<pre><code>## -------------------------------------------------------------------------</code></pre>
-<pre><code>## You have loaded plyr after dplyr - this is likely to cause problems.
-## If you need functions from both plyr and dplyr, please load plyr first, then dplyr:
-## library(plyr); library(dplyr)</code></pre>
-<pre><code>## -------------------------------------------------------------------------</code></pre>
-<pre><code>## 
-## Attaching package: 'plyr'</code></pre>
-<pre><code>## The following objects are masked from 'package:dplyr':
-## 
-##     arrange, count, desc, failwith, id, mutate, rename, summarise,
-##     summarize</code></pre>
-<pre class="r"><code>set.seed(1234)
+modegbm &lt;- train(classe~., data = training, method = &quot;gbm&quot;)
+
+set.seed(1234)
 moderf &lt;- train(classe ~., data=training, method = &quot;rf&quot;)</code></pre>
-<pre><code>## Loading required package: randomForest</code></pre>
-<pre><code>## randomForest 4.6-12</code></pre>
-<pre><code>## Type rfNews() to see new features/changes/bug fixes.</code></pre>
-<pre><code>## 
-## Attaching package: 'randomForest'</code></pre>
-<pre><code>## The following object is masked from 'package:ggplot2':
-## 
-##     margin</code></pre>
-<pre><code>## The following object is masked from 'package:dplyr':
-## 
-##     combine</code></pre>
-<pre class="r"><code>modegbm</code></pre>
+<p>Result of the model:</p>
 <pre><code>## Stochastic Gradient Boosting 
 ## 
 ## 13737 samples
@@ -212,7 +190,6 @@ moderf &lt;- train(classe ~., data=training, method = &quot;rf&quot;)</code></pr
 ## Accuracy was used to select the optimal model using  the largest value.
 ## The final values used for the model were n.trees = 150,
 ##  interaction.depth = 3, shrinkage = 0.1 and n.minobsinnode = 10.</code></pre>
-<pre class="r"><code>moderf</code></pre>
 <pre><code>## Random Forest 
 ## 
 ## 13737 samples
@@ -238,9 +215,7 @@ moderf &lt;- train(classe ~., data=training, method = &quot;rf&quot;)</code></pr
 confgbm &lt;- confusionMatrix(testing$classe, predgbm)
 
 predrf = predict(moderf, testing)
-confrf &lt;- confusionMatrix(testing$classe, predrf)
-
-confgbm</code></pre>
+confrf &lt;- confusionMatrix(testing$classe, predrf)</code></pre>
 <pre><code>## Confusion Matrix and Statistics
 ## 
 ##           Reference
@@ -272,7 +247,6 @@ confgbm</code></pre>
 ## Detection Rate         0.2666   0.1611   0.1502   0.1400   0.1665
 ## Detection Prevalence   0.2845   0.1935   0.1743   0.1638   0.1839
 ## Balanced Accuracy      0.9514   0.8998   0.8885   0.9251   0.9648</code></pre>
-<pre class="r"><code>confrf</code></pre>
 <pre><code>## Confusion Matrix and Statistics
 ## 
 ##           Reference
@@ -304,7 +278,7 @@ confgbm</code></pre>
 ## Detection Rate         0.2836   0.1912   0.1698   0.1577   0.1830
 ## Detection Prevalence   0.2845   0.1935   0.1743   0.1638   0.1839
 ## Balanced Accuracy      0.9944   0.9885   0.9822   0.9910   0.9967</code></pre>
-<p>In this comparison, the overall accuracy of gbm model is 88.4451997%, and the overall accuracy of random forest model is 98.5216653%. So it’s obvious that the rf model fits more in this study.</p>
+<p>In this comparison, the overall accuracy of gbm model is 88.45%, and the overall accuracy of random forest model is 98.52%. So it’s obvious that the rf model is more accurate in this study.</p>
 </div>
 <div id="so-finally-the-rf-prediction-model-is-used-to-predict-20-different-test-cases." class="section level3">
 <h3>So finally, the rf prediction model is used to predict 20 different test cases.</h3>
@@ -322,8 +296,8 @@ results &lt;- predict(moderf, validation)
 results &lt;- paste(c(1:20), results, sep = &quot;.&quot;)</code></pre>
 </div>
 </div>
-<div id="result" class="section level2">
-<h2>Result</h2>
+<div id="results" class="section level2">
+<h2>Results</h2>
 <pre><code>##  [1] &quot;1.B&quot;  &quot;2.A&quot;  &quot;3.B&quot;  &quot;4.A&quot;  &quot;5.A&quot;  &quot;6.E&quot;  &quot;7.D&quot;  &quot;8.B&quot;  &quot;9.A&quot;  &quot;10.A&quot;
 ## [11] &quot;11.B&quot; &quot;12.C&quot; &quot;13.B&quot; &quot;14.A&quot; &quot;15.E&quot; &quot;16.E&quot; &quot;17.A&quot; &quot;18.B&quot; &quot;19.B&quot; &quot;20.B&quot;</code></pre>
 </div>

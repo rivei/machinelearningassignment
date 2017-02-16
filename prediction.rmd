@@ -32,38 +32,46 @@ if(!file.exists("../pml-training.csv")) {
 dataorg <- read.csv("../pml-training.csv", header = TRUE, na.strings = c("","NA","#DIV/0!"))
 ```
 
-Columns with too many empty values and those not so relevant (column 1 to 7) are deleted
+
+Columns with too many empty values and those not so relevant (columnS 1 to 7) are deleted
 ```{r cleanvoid}
 intraining <- dataorg[, 8:160]
 intraining <- intraining[, apply(intraining, 2, function(x) all(!is.na(x)))]
 ```
 
-There are still `r dim(intraining)[2]` variables in the data, which is still too large dataset for running prediction. In this case, those highly correlated variables are excluded, because they can be represented by their correlated variables.
+
+There are still `r dim(intraining)[2]` variables in the data, which is a little too large dataset for running prediction. In this case, those highly correlated variables are excluded, because they can be represented by other correlated variables.
+
+
 ```{r cleancorr}
 colnumber <- dim(intraining)[2]
 corrDF <- cor(intraining[,1:colnumber -1])
 resCorr <- findCorrelation(corrDF, 0.6)
 intraining <- intraining[, -resCorr]
 ```
-Till here, the number of predictors is reduced to: `r dim(intraining)[2]`
+
+Till here, the number of predictors is reduced to `r dim(intraining)[2]`.
 
 
-### Use Boosting and Ramdom Forest method to build the fitting model
+### Use Boosting and Ramdom Forest methods to build the fitting model
+Both methods are learned in the lectures and they are suitable for classification like this case.
+
 ```{r mod}
 inTrain <- createDataPartition(y=intraining$classe, p=0.7, list = FALSE)
 training <- intraining[inTrain,]
 testing <- intraining[-inTrain,]
 
 set.seed(1235)
-#modelda <- train(classe ~., data=training, method = "lda")
-modegbm <- train(classe~., data = training, method = "gbm", verbose = FALSE)
+modegbm <- train(classe~., data = training, method = "gbm")
 
 set.seed(1234)
 moderf <- train(classe ~., data=training, method = "rf")
+```
 
+Result of the model:
+```{r showmodel, echo=FALSE}
 modegbm
 moderf
-
 ```
 
 
@@ -75,10 +83,15 @@ confgbm <- confusionMatrix(testing$classe, predgbm)
 predrf = predict(moderf, testing)
 confrf <- confusionMatrix(testing$classe, predrf)
 
+```
+
+```{r showmatrix, echo=FALSE}
 confgbm
 confrf
 ```
-In this comparison, the overall accuracy of gbm model is `r confgbm$overall["Accuracy"]*100`%, and the overall accuracy of random forest model is `r confrf$overall["Accuracy"]*100`%. So it's obvious that the rf model fits more in this study.
+
+In this comparison, the overall accuracy of gbm model is `r round(confgbm$overall["Accuracy"]*100, 2)`%, and the overall accuracy of random forest model is `r round(confrf$overall["Accuracy"]*100, 2)`%. So it's obvious that the rf model is more accurate in this study.
+
 
 ### So finally, the rf prediction model is used to predict 20 different test cases.
 ```{r}
@@ -96,7 +109,7 @@ results <- predict(moderf, validation)
 results <- paste(c(1:20), results, sep = ".")
 ```
 
-## Result
+## Results
 ```{r showresult, echo = FALSE}
 results
 ```
