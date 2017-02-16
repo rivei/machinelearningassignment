@@ -132,32 +132,46 @@ $(document).ready(function () {
 <div id="process" class="section level2">
 <h2>Process:</h2>
 <div id="preparation-of-clean-data-for-building-model." class="section level3">
-<h3>1. Preparation of clean data for building model.</h3>
+<h3>Preparation of clean data for building model.</h3>
 <pre class="r"><code>if(!file.exists(&quot;../pml-training.csv&quot;)) {
         download.file(&quot;https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv&quot;,
                       destfile = &quot;../pml-training.csv&quot;)
 }
 
 dataorg &lt;- read.csv(&quot;../pml-training.csv&quot;, header = TRUE, na.strings = c(&quot;&quot;,&quot;NA&quot;,&quot;#DIV/0!&quot;))</code></pre>
-<p>Columns with too many empty values and those not so relevant are deleted</p>
+<p>Columns with too many empty values and those not so relevant (column 1 to 7) are deleted</p>
 <pre class="r"><code>intraining &lt;- dataorg[, 8:160]
-intraining &lt;- intraining[, apply(intraining, 2, function(x) all(!is.na(x)))]
-colnumber &lt;- dim(intraining)[2]</code></pre>
-<p>Also highly correlated variables can be excluded, because they can be represented by their correlated variables</p>
-<pre class="r"><code>corrDF &lt;- cor(intraining[,1:colnumber -1])
-resCorr &lt;- findCorrelation(corrDF, 0.5)
+intraining &lt;- intraining[, apply(intraining, 2, function(x) all(!is.na(x)))]</code></pre>
+<p>There are still 53 variables in the data, which is still too large dataset for running prediction. In this case, those highly correlated variables are excluded, because they can be represented by their correlated variables.</p>
+<pre class="r"><code>colnumber &lt;- dim(intraining)[2]
+corrDF &lt;- cor(intraining[,1:colnumber -1])
+resCorr &lt;- findCorrelation(corrDF, 0.6)
 intraining &lt;- intraining[, -resCorr]</code></pre>
-<p>Till here, the dimension of the prediction data is reduced to: 19622, 22</p>
+<p>Till here, the number of predictors is reduced to: 26</p>
 </div>
-<div id="use-ramdom-forest-method-to-build-the-fitting-model" class="section level3">
-<h3>2. Use Ramdom Forest method to build the fitting model</h3>
-<pre class="r"><code>inTrain &lt;- createDataPartition(y=intraining$classe, p=0.6, list = FALSE)
+<div id="use-boosting-and-ramdom-forest-method-to-build-the-fitting-model" class="section level3">
+<h3>Use Boosting and Ramdom Forest method to build the fitting model</h3>
+<pre class="r"><code>inTrain &lt;- createDataPartition(y=intraining$classe, p=0.7, list = FALSE)
 training &lt;- intraining[inTrain,]
 testing &lt;- intraining[-inTrain,]
 
-
-set.seed(1234)
-modfit &lt;- train(classe ~., method = &quot;rf&quot;, data=training)</code></pre>
+set.seed(1235)
+#modelda &lt;- train(classe ~., data=training, method = &quot;lda&quot;)
+modegbm &lt;- train(classe~., data = training, method = &quot;gbm&quot;, verbose = FALSE)</code></pre>
+<pre><code>## Loading required package: plyr</code></pre>
+<pre><code>## -------------------------------------------------------------------------</code></pre>
+<pre><code>## You have loaded plyr after dplyr - this is likely to cause problems.
+## If you need functions from both plyr and dplyr, please load plyr first, then dplyr:
+## library(plyr); library(dplyr)</code></pre>
+<pre><code>## -------------------------------------------------------------------------</code></pre>
+<pre><code>## 
+## Attaching package: 'plyr'</code></pre>
+<pre><code>## The following objects are masked from 'package:dplyr':
+## 
+##     arrange, count, desc, failwith, id, mutate, rename, summarise,
+##     summarize</code></pre>
+<pre class="r"><code>set.seed(1234)
+moderf &lt;- train(classe ~., data=training, method = &quot;rf&quot;)</code></pre>
 <pre><code>## Loading required package: randomForest</code></pre>
 <pre><code>## randomForest 4.6-12</code></pre>
 <pre><code>## Type rfNews() to see new features/changes/bug fixes.</code></pre>
@@ -169,66 +183,131 @@ modfit &lt;- train(classe ~., method = &quot;rf&quot;, data=training)</code></pr
 <pre><code>## The following object is masked from 'package:dplyr':
 ## 
 ##     combine</code></pre>
-<pre class="r"><code>modfit</code></pre>
-<pre><code>## Random Forest 
+<pre class="r"><code>modegbm</code></pre>
+<pre><code>## Stochastic Gradient Boosting 
 ## 
-## 11776 samples
-##    21 predictor
+## 13737 samples
+##    25 predictor
 ##     5 classes: 'A', 'B', 'C', 'D', 'E' 
 ## 
 ## No pre-processing
 ## Resampling: Bootstrapped (25 reps) 
-## Summary of sample sizes: 11776, 11776, 11776, 11776, 11776, 11776, ... 
+## Summary of sample sizes: 13737, 13737, 13737, 13737, 13737, 13737, ... 
+## Resampling results across tuning parameters:
+## 
+##   interaction.depth  n.trees  Accuracy   Kappa    
+##   1                   50      0.6666803  0.5761000
+##   1                  100      0.7117522  0.6343915
+##   1                  150      0.7368898  0.6666323
+##   2                   50      0.7572733  0.6919412
+##   2                  100      0.8111854  0.7608280
+##   2                  150      0.8401039  0.7975252
+##   3                   50      0.8042149  0.7518173
+##   3                  100      0.8550592  0.8164584
+##   3                  150      0.8822006  0.8508532
+## 
+## Tuning parameter 'shrinkage' was held constant at a value of 0.1
+## 
+## Tuning parameter 'n.minobsinnode' was held constant at a value of 10
+## Accuracy was used to select the optimal model using  the largest value.
+## The final values used for the model were n.trees = 150,
+##  interaction.depth = 3, shrinkage = 0.1 and n.minobsinnode = 10.</code></pre>
+<pre class="r"><code>moderf</code></pre>
+<pre><code>## Random Forest 
+## 
+## 13737 samples
+##    25 predictor
+##     5 classes: 'A', 'B', 'C', 'D', 'E' 
+## 
+## No pre-processing
+## Resampling: Bootstrapped (25 reps) 
+## Summary of sample sizes: 13737, 13737, 13737, 13737, 13737, 13737, ... 
 ## Resampling results across tuning parameters:
 ## 
 ##   mtry  Accuracy   Kappa    
-##    2    0.9676005  0.9589993
-##   11    0.9575378  0.9462626
-##   21    0.9404021  0.9245874
+##    2    0.9776714  0.9717578
+##   13    0.9712099  0.9635877
+##   25    0.9583866  0.9473759
 ## 
 ## Accuracy was used to select the optimal model using  the largest value.
 ## The final value used for the model was mtry = 2.</code></pre>
 </div>
-<div id="validate-the-fitting-model" class="section level3">
-<h3>3.Validate the fitting model using Confusion Matrix</h3>
-<pre class="r"><code>pred = predict(modfit, testing)
-confMx &lt;- confusionMatrix(testing$classe, pred)
-confMx</code></pre>
+<div id="comparing-two-models-using-confusion-matrix" class="section level3">
+<h3>3.Comparing two models using Confusion Matrix</h3>
+<pre class="r"><code>predgbm = predict(modegbm, testing)
+confgbm &lt;- confusionMatrix(testing$classe, predgbm)
+
+predrf = predict(moderf, testing)
+confrf &lt;- confusionMatrix(testing$classe, predrf)
+
+confgbm</code></pre>
 <pre><code>## Confusion Matrix and Statistics
 ## 
 ##           Reference
 ## Prediction    A    B    C    D    E
-##          A 2210   14    2    5    1
-##          B   26 1479   11    0    2
-##          C    1   25 1332   10    0
-##          D    3    2   52 1226    3
-##          E    3    1    6    1 1431
+##          A 1569   26   38   39    2
+##          B  103  948   53   16   19
+##          C   14   90  884   30    8
+##          D    4   36   78  824   22
+##          E    1   29   43   29  980
 ## 
 ## Overall Statistics
-##                                           
-##                Accuracy : 0.9786          
-##                  95% CI : (0.9751, 0.9817)
-##     No Information Rate : 0.2859          
-##     P-Value [Acc &gt; NIR] : &lt; 2.2e-16       
-##                                           
-##                   Kappa : 0.9729          
-##  Mcnemar's Test P-Value : 4.696e-07       
+##                                          
+##                Accuracy : 0.8845         
+##                  95% CI : (0.876, 0.8925)
+##     No Information Rate : 0.2873         
+##     P-Value [Acc &gt; NIR] : &lt; 2.2e-16      
+##                                          
+##                   Kappa : 0.8538         
+##  Mcnemar's Test P-Value : &lt; 2.2e-16      
 ## 
 ## Statistics by Class:
 ## 
 ##                      Class: A Class: B Class: C Class: D Class: E
-## Sensitivity            0.9853   0.9724   0.9494   0.9871   0.9958
-## Specificity            0.9961   0.9938   0.9944   0.9909   0.9983
-## Pos Pred Value         0.9901   0.9743   0.9737   0.9533   0.9924
-## Neg Pred Value         0.9941   0.9934   0.9890   0.9976   0.9991
-## Prevalence             0.2859   0.1939   0.1788   0.1583   0.1832
-## Detection Rate         0.2817   0.1885   0.1698   0.1563   0.1824
-## Detection Prevalence   0.2845   0.1935   0.1744   0.1639   0.1838
-## Balanced Accuracy      0.9907   0.9831   0.9719   0.9890   0.9971</code></pre>
-<p>In this model, the overall accuracy is 97.8587815%</p>
+## Sensitivity            0.9279   0.8397   0.8066   0.8785   0.9505
+## Specificity            0.9750   0.9598   0.9703   0.9717   0.9790
+## Pos Pred Value         0.9373   0.8323   0.8616   0.8548   0.9057
+## Neg Pred Value         0.9710   0.9619   0.9564   0.9768   0.9894
+## Prevalence             0.2873   0.1918   0.1862   0.1594   0.1752
+## Detection Rate         0.2666   0.1611   0.1502   0.1400   0.1665
+## Detection Prevalence   0.2845   0.1935   0.1743   0.1638   0.1839
+## Balanced Accuracy      0.9514   0.8998   0.8885   0.9251   0.9648</code></pre>
+<pre class="r"><code>confrf</code></pre>
+<pre><code>## Confusion Matrix and Statistics
+## 
+##           Reference
+## Prediction    A    B    C    D    E
+##          A 1669    4    0    1    0
+##          B   11 1125    2    0    1
+##          C    5   18  999    4    0
+##          D    1    1   29  928    5
+##          E    0    0    0    5 1077
+## 
+## Overall Statistics
+##                                           
+##                Accuracy : 0.9852          
+##                  95% CI : (0.9818, 0.9881)
+##     No Information Rate : 0.2865          
+##     P-Value [Acc &gt; NIR] : &lt; 2.2e-16       
+##                                           
+##                   Kappa : 0.9813          
+##  Mcnemar's Test P-Value : NA              
+## 
+## Statistics by Class:
+## 
+##                      Class: A Class: B Class: C Class: D Class: E
+## Sensitivity            0.9899   0.9800   0.9699   0.9893   0.9945
+## Specificity            0.9988   0.9970   0.9944   0.9927   0.9990
+## Pos Pred Value         0.9970   0.9877   0.9737   0.9627   0.9954
+## Neg Pred Value         0.9960   0.9952   0.9936   0.9980   0.9988
+## Prevalence             0.2865   0.1951   0.1750   0.1594   0.1840
+## Detection Rate         0.2836   0.1912   0.1698   0.1577   0.1830
+## Detection Prevalence   0.2845   0.1935   0.1743   0.1638   0.1839
+## Balanced Accuracy      0.9944   0.9885   0.9822   0.9910   0.9967</code></pre>
+<p>In this comparison, the overall accuracy of gbm model is 88.4451997%, and the overall accuracy of random forest model is 98.5216653%. So it’s obvious that the rf model fits more in this study.</p>
 </div>
-<div id="finally-this-prediction-model-is-used-to-predict-20-different-test-cases." class="section level3">
-<h3>4. Finally, this prediction model is used to predict 20 different test cases.</h3>
+<div id="so-finally-the-rf-prediction-model-is-used-to-predict-20-different-test-cases." class="section level3">
+<h3>So finally, the rf prediction model is used to predict 20 different test cases.</h3>
 <pre class="r"><code>if(!file.exists(&quot;../pml-testing.csv&quot;)) {
         download.file(&quot;https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv&quot;,
                       destfile = &quot;../pml-testing.csv&quot;)
@@ -239,7 +318,7 @@ validation &lt;- read.csv(&quot;../pml-testing.csv&quot; ,header = TRUE,  na.str
 colnumber &lt;- dim(intraining)[2]
 validation &lt;- subset(validation, select = names(intraining[,-colnumber]))
 
-results &lt;- predict(modfit, validation)
+results &lt;- predict(moderf, validation)
 results &lt;- paste(c(1:20), results, sep = &quot;.&quot;)</code></pre>
 </div>
 </div>

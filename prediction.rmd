@@ -6,9 +6,10 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
 library(dplyr)
 library(caret)
+library(gbm)
 ```
 
 ## Background
@@ -20,7 +21,7 @@ The goal of this project is to predict the manner in which they did the exercise
 
 ## Process:
 
-### 1. Preparation of clean data for building model.
+### Preparation of clean data for building model.
 ```{r readdata}
 
 if(!file.exists("../pml-training.csv")) {
@@ -31,47 +32,55 @@ if(!file.exists("../pml-training.csv")) {
 dataorg <- read.csv("../pml-training.csv", header = TRUE, na.strings = c("","NA","#DIV/0!"))
 ```
 
-Columns with too many empty values and those not so relevant are deleted
-```{r}
+Columns with too many empty values and those not so relevant (column 1 to 7) are deleted
+```{r cleanvoid}
 intraining <- dataorg[, 8:160]
 intraining <- intraining[, apply(intraining, 2, function(x) all(!is.na(x)))]
+```
+
+There are still `r dim(intraining)[2]` variables in the data, which is still too large dataset for running prediction. In this case, those highly correlated variables are excluded, because they can be represented by their correlated variables.
+```{r cleancorr}
 colnumber <- dim(intraining)[2]
-```
-
-Also highly correlated variables can be excluded, because they can be represented by their correlated variables
-```{r}
 corrDF <- cor(intraining[,1:colnumber -1])
-resCorr <- findCorrelation(corrDF, 0.5)
+resCorr <- findCorrelation(corrDF, 0.6)
 intraining <- intraining[, -resCorr]
-
 ```
-Till here, the dimension of the prediction data is reduced to: `r dim(intraining)`
+Till here, the number of predictors is reduced to: `r dim(intraining)[2]`
 
 
-### 2. Use Ramdom Forest method to build the fitting model
+### Use Boosting and Ramdom Forest method to build the fitting model
 ```{r mod}
-
-inTrain <- createDataPartition(y=intraining$classe, p=0.6, list = FALSE)
+inTrain <- createDataPartition(y=intraining$classe, p=0.7, list = FALSE)
 training <- intraining[inTrain,]
 testing <- intraining[-inTrain,]
 
+set.seed(1235)
+#modelda <- train(classe ~., data=training, method = "lda")
+modegbm <- train(classe~., data = training, method = "gbm", verbose = FALSE)
 
 set.seed(1234)
-modfit <- train(classe ~., method = "rf", data=training)
-modfit
+moderf <- train(classe ~., data=training, method = "rf")
+
+modegbm
+moderf
 
 ```
 
 
-### 3.Validate the fitting model using Confusion Matrix
+### 3.Comparing two models using Confusion Matrix
 ```{r }
-pred = predict(modfit, testing)
-confMx <- confusionMatrix(testing$classe, pred)
-confMx
-```
-In this model, the overall accuracy is `r confMx$overall["Accuracy"]*100`%
+predgbm = predict(modegbm, testing)
+confgbm <- confusionMatrix(testing$classe, predgbm)
 
-### 4. Finally, this prediction model is used to predict 20 different test cases.
+predrf = predict(moderf, testing)
+confrf <- confusionMatrix(testing$classe, predrf)
+
+confgbm
+confrf
+```
+In this comparison, the overall accuracy of gbm model is `r confgbm$overall["Accuracy"]*100`%, and the overall accuracy of random forest model is `r confrf$overall["Accuracy"]*100`%. So it's obvious that the rf model fits more in this study.
+
+### So finally, the rf prediction model is used to predict 20 different test cases.
 ```{r}
 if(!file.exists("../pml-testing.csv")) {
         download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv",
@@ -83,7 +92,7 @@ validation <- read.csv("../pml-testing.csv" ,header = TRUE,  na.strings = c("","
 colnumber <- dim(intraining)[2]
 validation <- subset(validation, select = names(intraining[,-colnumber]))
 
-results <- predict(modfit, validation)
+results <- predict(moderf, validation)
 results <- paste(c(1:20), results, sep = ".")
 ```
 
